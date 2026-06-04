@@ -1,0 +1,25 @@
+# Excluir datos crudos y descargas pesadas
+descargas/
+temp/
+
+# Excluir el archivo de configuración con credenciales
+scripts/config.py
+
+# Excluir cachés de Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.log
+
+# Archivos temporales de Microsoft Office y Windows
+~$*
+*.tmp
+~*.tmp
+
+# Archivos de bloqueo y respaldo de QGIS
+*.qgs~
+*.qgz~
+*.qml~
+*.qlr~

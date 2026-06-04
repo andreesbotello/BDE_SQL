@@ -1,0 +1,226 @@
+=====================================================================
+REPORTE DE EJECUCIÓN DEL PIPELINE COMPLETO
+Municipio: 29051
+Fecha Inicio: 2026-06-04 13:16:14
+=====================================================================
+
+=== SCRIPT: descargas.py | INICIO: 2026-06-04 13:16:14 ===
+Iniciando descargas para el municipio: Estepona (Málaga) con código: 29051
+
+--- 4.1. Descargando Parcelas Catastrales ---
+Archivo ya existe: C:\Users\bryan\Desktop\UPV\S2\1_Distribucion\BLOQUE1\Proyecto_Final\descargas\Parcelas_29051.zip
+
+--- 4.2. Descargando Buildings Catastrales ---
+Archivo ya existe: C:\Users\bryan\Desktop\UPV\S2\1_Distribucion\BLOQUE1\Proyecto_Final\descargas\Buildings_29051.zip
+
+--- 4.3. Descargando Redes de Transporte ---
+Archivo ya existe: C:\Users\bryan\Desktop\UPV\S2\1_Distribucion\BLOQUE1\Proyecto_Final\descargas\RT_MALAGA_shp.zip
+
+--- 4.4. Descargando Hidrografía por Intersección Espacial ---
+
+=== Iniciando Análisis e Intersección de Hidrografía (Influencia: general -> 500m) ===
+Columna de código municipal identificada: 'INSPIREID' (Valor de búsqueda: ES.IGN.BDDAE.34012929051)
+Se encontraron 25 archivos de cuencas para evaluar.
+  [INTERSECTA] Municipio intersecta con la cuenca: Cuencas_Mediterraneas_Andaluzas (ES060)
+
+Se procederá a descargar 1 cuenca(s) hidrográfica(s) detectada(s)...
+  -> Descargando cuenca: Cuencas_Mediterraneas_Andaluzas (ES060)...
+Archivo ya existe: C:\Users\bryan\Desktop\UPV\S2\1_Distribucion\BLOQUE1\Proyecto_Final\descargas\DH_V0_ES060_Cuencas_Mediterraneas_Andaluzas.ZIP
+
+--- 4.5. Descargando Líneas Límite (Líneas Base) ---
+Archivo ya existe: C:\Users\bryan\Desktop\UPV\S2\1_Distribucion\BLOQUE1\Proyecto_Final\descargas\lineas_limite.zip
+
+--- 4.6. Descargando SIOSE Geopackage ---
+Archivo ya existe: C:\Users\bryan\Desktop\UPV\S2\1_Distribucion\BLOQUE1\Proyecto_Final\descargas\SIOSE_Andalucia_2014_GPKG.zip
+
+=== Descargas completadas. ===
+
+=== SCRIPT: descargas.py | FIN | DURACIÓN: 1.14s | CÓDIGO DE RETORNO: 0 ===
+
+=== SCRIPT: generar_metadata.py | INICIO: 2026-06-04 13:16:15 ===
+=====================================================================
+GENERADOR DE METADATOS DE ARCHIVOS DESCARGADOS
+=====================================================================
+Detectados 6 archivos ZIP para analizar.
+El archivo de metadatos ya existe y es válido: Buildings_29051_metadata.json. Omitiendo análisis.
+El archivo de metadatos ya existe y es válido: DH_V0_ES060_Cuencas_Mediterraneas_Andaluzas_metadata.json. Omitiendo análisis.
+El archivo de metadatos ya existe y es válido: Parcelas_29051_metadata.json. Omitiendo análisis.
+El archivo de metadatos ya existe y es válido: RT_MALAGA_shp_metadata.json. Omitiendo análisis.
+El archivo de metadatos ya existe y es válido: SIOSE_Andalucia_2014_GPKG_metadata.json. Omitiendo análisis.
+El archivo de metadatos ya existe y es válido: lineas_limite_metadata.json. Omitiendo análisis.
+=====================================================================
+
+=== SCRIPT: generar_metadata.py | FIN | DURACIÓN: 0.46s | CÓDIGO DE RETORNO: 0 ===
+
+=== SCRIPT: inicializar_db.py | INICIO: 2026-06-04 13:16:15 ===
+=====================================================================
+INICIALIZADOR DE BASE DE DATOS Y ESQUEMAS POSTGIS
+=====================================================================
+Conectando a servidor PostgreSQL (db: 'postgres') en localhost:5432...
+La base de datos 'proyecto_final' ya existe.
+
+Conectando a la base de datos del proyecto 'proyecto_final'...
+Leyendo y ejecutando sentencias de: inicializar_db.sql...
+[OK] Sentencias de inicializar_db.sql ejecutadas exitosamente.
+
+=====================================================================
+INICIALIZACIÓN COMPLETADA CON ÉXITO para la base de datos: proyecto_final
+=====================================================================
+
+=== SCRIPT: inicializar_db.py | FIN | DURACIÓN: 0.45s | CÓDIGO DE RETORNO: 0 ===
+
+=== SCRIPT: importar_jcm1.py | INICIO: 2026-06-04 13:16:16 ===
+¿Desea sobrescribir todas las tablas y reiniciar el esquema jcm1? (s/n) [s]: [NOTE] Saltando limpieza de esquema. Solo se importarán las tablas faltantes.
+=== Iniciando Importación de Capas Requeridas en Esquema 'jcm1' ===
+
+[SKIP] La tabla jcm1.cadastralparcel ya existe. Saltando importación...
+
+[SKIP] La tabla jcm1.building ya existe. Saltando importación...
+
+[SKIP] La tabla jcm1.buildingpart ya existe. Saltando importación...
+
+[SKIP] La tabla jcm1.tramovial ya existe. Saltando importación...
+
+[SKIP] La tabla jcm1.portalpk ya existe. Saltando importación...
+
+[SKIP] La tabla jcm1.tramocurso ya existe. Saltando importación...
+
+[SKIP] La tabla jcm1.ttmm ya existe. Saltando importación...
+
+=== SCRIPT: importar_jcm1.py | FIN | DURACIÓN: 8.43s | CÓDIGO DE RETORNO: 0 ===
+
+=== SCRIPT: procesar_jcm2.py | INICIO: 2026-06-04 13:16:24 ===
+=====================================================================
+PROCESADOR DE MODELO DE DATOS Y REFINAMIENTO DE GEOMETRÍAS (jcm2)
+=====================================================================
+Leyendo procesar_jcm2.sql y reemplazando marcador de municipio (CODIGO: 29051)...
+Conectando a base de datos 'proyecto_final' en localhost:5432...
+Ejecutando sentencias SQL para construir el esquema jcm2...
+[OK] Sentencias ejecutadas con éxito.
+
+Ejecutando consultas de validación desde validar_jcm2.sql...
+
+=====================================================================
+INFORME DE CONTROL DE CALIDAD Y REGISTROS IMPORTADOS (jcm2)
+=====================================================================
+ - jcm2.siose_hilucs       : 16 registros.
+   - Integridad geométrica: No aplica (tabla alfanumérica).
+ - jcm2.siose_codiige      : 46 registros.
+   - Integridad geométrica: No aplica (tabla alfanumérica).
+ - jcm2.ttmm               : 1 registros.
+   - Integridad geométrica: Todas las geometrías son válidas.
+ - jcm2.tramocurso         : 422 registros.
+   - Integridad geométrica: Todas las geometrías son válidas.
+ - jcm2.siose_pol          : 2307 registros.
+   - Integridad geométrica: Todas las geometrías son válidas.
+ - jcm2.tramovial          : 8087 registros.
+   - Integridad geométrica: Todas las geometrías son válidas.
+ - jcm2.building           : 11751 registros.
+   - Integridad geométrica: Todas las geometrías son válidas.
+ - jcm2.cadastralparcel    : 16983 registros.
+   - Integridad geométrica: Todas las geometrías son válidas.
+ - jcm2.portalpk           : 12907 registros.
+   - Integridad geométrica: Todas las geometrías son válidas.
+ - jcm2.buildingpart       : 58592 registros.
+   - Integridad geométrica: Todas las geometrías son válidas.
+
+=====================================================================
+[OK] Integridad geométrica: PASADO (0 geometrías inválidas en capas espaciales).
+=====================================================================
+
+Ejecutando informe de limpieza y depuración desde reporte_limpieza.sql...
+
+=========================================================================================================================
+REPORTE DETALLADO DE LIMPIEZA Y DEPURACIÓN DE DATOS (jcm1 -> jcm2)
+=========================================================================================================================
+Tabla              | Total jcm1 (500m)  | Total jcm2 (Depurado)  | Inválidos  | Multipartes | Slivers <0.5 | Incoherencias
+-------------------------------------------------------------------------------------------------------------------------
+building           | 11758              | 11751                  | 0          | 2470        | 7            | 11709        
+buildingpart       | 58908              | 58592                  | 0          | 0           | 316          | 0            
+cadastralparcel    | 16985              | 16983                  | 0          | 0           | 2            | 0            
+tramovial          | 8088               | 8087                   | 0          | 0           | 1            | 0            
+portalpk           | 12907              | 12907                  | 0          | 0           | 0            | 0            
+tramocurso         | 422                | 422                    | 0          | 0           | 0            | 0            
+siose_pol          | 2307               | 2307                   | 1          | 0           | 0            | 0            
+=========================================================================================================================
+
+=====================================================================
+PROCESAMIENTO DE ESQUEMA jcm2 COMPLETADO CON ÉXITO
+=====================================================================
+
+=== SCRIPT: procesar_jcm2.py | FIN | DURACIÓN: 490.63s | CÓDIGO DE RETORNO: 0 ===
+
+=== SCRIPT: procesar_jcm3.py | INICIO: 2026-06-04 13:24:35 ===
+=====================================================================
+PROCESADOR DE ANÁLISIS ESPACIAL Y REGLAS TOPOLÓGICAS (jcm3)
+=====================================================================
+Leyendo procesar_jcm3.sql...
+Conectando a base de datos 'proyecto_final' en localhost:5432...
+Ejecutando sentencias SQL para construir el esquema jcm3 y disparadores...
+[OK] Sentencias ejecutadas con éxito en la base de datos.
+
+================================================================================
+REPORTE DE RESULTADOS DE CONSULTAS ESPACIALES (SECCIÓN 8 Y 9)
+================================================================================
+Q8.1.1. Parcelas catastrales con algún edificio en su interior: 12499
+Q8.1.2. Parcelas catastrales vacías (sin ningún edificio): 4484
+Q8.1.3. Parcela con más edificios dentro: Ref. ES.SDGC.CP.29051A90009700 (102 edificios)
+Q8.2.   Edificios aislados (sin vecinos en un radio de 100m): 127
+
+Q8.3.   Área total de edificios por tipo de suelo SIOSE (Top 5):
+        - Cód: 113 | Discontinuo                         : 1,439,904.85 m2
+        - Cód: 112 | Ensanche                            : 663,760.47 m2
+        - Cód: 140 | Servicio dotacional                 : 402,299.02 m2
+        - Cód: 111 | Casco                               : 220,325.32 m2
+        - Cód: 130 | Industrial                          : 215,311.72 m2
+
+Q8.4.   Edificios con mayor volumen estimado de sótanos (Top 5):
+        - Edificio: ES.SDGC.BU.1245203UF1314N : 53,205.51 m3
+        - Edificio: ES.SDGC.BU.7738101UF0373N : 49,043.21 m3
+        - Edificio: ES.SDGC.BU.3139703UF0333N : 48,065.95 m3
+        - Edificio: ES.SDGC.BU.0743901UF1304S : 44,837.55 m3
+        - Edificio: ES.SDGC.BU.9277402UF1397N : 43,559.04 m3
+
+Q8.5.1. Edificios a menos de 50 metros de un cauce fluvial (inundación): 1306
+Q8.5.2. Densidad edificada por polígono SIOSE urbano (Top 5 más densos):
+        - Polígono ID: 1739  | Cód SIOSE: 113 (Discontinuo) : 64.88% edificado
+        - Polígono ID: 169   | Cód SIOSE: 130 (Industrial) : 63.49% edificado
+        - Polígono ID: 1665  | Cód SIOSE: 111 (Casco) : 56.90% edificado
+        - Polígono ID: 1031  | Cód SIOSE: 130 (Industrial) : 54.29% edificado
+        - Polígono ID: 803   | Cód SIOSE: 112 (Ensanche) : 45.57% edificado
+
+================================================================================
+RESULTADOS DEL ANÁLISIS DE LOCALIZACIÓN ÓPTIMA MULTICRITERIO (SECCIÓN 9)
+================================================================================
+Se han identificado 207 parcelas catastrales óptimas para equipamientos públicos.
+
+Muestra de las parcelas óptimas candidatas (Top 5 por área):
+  - Ref Catastral: ES.SDGC.CP.29051A01500008 | LocalID: 29051A01500008 | Superficie: 193,817.00 m2
+  - Ref Catastral: ES.SDGC.CP.29051A01400241 | LocalID: 29051A01400241 | Superficie: 111,853.00 m2
+  - Ref Catastral: ES.SDGC.CP.29051A00300279 | LocalID: 29051A00300279 | Superficie: 48,194.00 m2
+  - Ref Catastral: ES.SDGC.CP.9584201UF1398S | LocalID: 9584201UF1398S | Superficie: 47,951.00 m2
+  - Ref Catastral: ES.SDGC.CP.9487801UF1398N | LocalID: 9487801UF1398N | Superficie: 40,453.00 m2
+================================================================================
+
+=====================================================================
+VALIDACIÓN EN VIVO DE DISPARADORES (TRIGGERS)
+=====================================================================
+Probando Trigger de Área Automática:
+  - Edificio Ref: ES.SDGC.BU.2455601UF1325N
+  - Área por función ST_Area: 17316.5137 m2
+  - Área en columna superficie_m2: 17316.5137 m2
+  [OK] El disparador calculó y guardó correctamente la superficie en la columna.
+
+Probando Trigger de Solapes (Simulando inserción de edificio solapado):
+  [OK] El servidor de base de datos rechazó la inserción exitosamente.
+  Mensaje de Error de PostGIS: ERROR:  ERROR DE INTEGRIDAD TOPOLÓGICA (SERVER-SIDE): El edificio que intenta insertar o modificar solapa espacialmente con otro edificio en más de 1.0 m2.
+
+=====================================================================
+ANÁLISIS DE ESQUEMA jcm3 COMPLETADO CON ÉXITO
+=====================================================================
+
+=== SCRIPT: procesar_jcm3.py | FIN | DURACIÓN: 31.59s | CÓDIGO DE RETORNO: 0 ===
+
+=====================================================================
+[PIPELINE EXITOSO] El flujo completo finalizó en 532.71 segundos.
+=====================================================================
