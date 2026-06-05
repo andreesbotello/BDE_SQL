@@ -434,7 +434,7 @@ SELECT
     tv.id_tramo AS tramovial_id,
     ST_Length(STX_Extract(ST_Intersection(b.geom, tv.geom), 2)) AS longitud,
     COALESCE(r.estado, 'Sin Error') AS estado,
-    ST_Multi(STX_Extract(ST_Intersection(b.geom, tv.geom), 2))::geometry(MultiLineString, 25830) AS geom
+    ST_Multi(STX_Extract(ST_Intersection(b.geom, tv.geom), 2))::geometry(MultiLineString, {{SRID_PROYECTO}}) AS geom
 FROM jcm2.building b
 JOIN jcm2.tramovial tv ON ST_Intersects(b.geom, tv.geom)
 LEFT JOIN jcm3.vial_edificio_reporte r ON r.tv_gid = tv.gid AND r.b_gid = b.gid
@@ -456,7 +456,7 @@ SELECT
     tv2.gid AS tramovial_gid2,
     tv1.id_tramo AS tramovial_id1,
     tv2.id_tramo AS tramovial_id2,
-    (ST_Dump(ST_Multi(STX_Extract(ST_Intersection(tv1.geom, tv2.geom), 1)))).geom::geometry(Point, 25830) AS geom
+    (ST_Dump(ST_Multi(STX_Extract(ST_Intersection(tv1.geom, tv2.geom), 1)))).geom::geometry(Point, {{SRID_PROYECTO}}) AS geom
 FROM jcm2.tramovial tv1
 JOIN jcm2.tramovial tv2 ON ST_Intersects(tv1.geom, tv2.geom) AND tv1.gid < tv2.gid
 WHERE ST_Relate(tv1.geom, tv2.geom, '0********')
@@ -469,7 +469,7 @@ SELECT
     tv2.gid AS tramovial_gid2,
     tv1.id_tramo AS tramovial_id1,
     tv2.id_tramo AS tramovial_id2,
-    (ST_Dump(ST_Multi(STX_Extract(ST_Intersection(tv1.geom, tv2.geom), 1)))).geom::geometry(Point, 25830) AS geom
+    (ST_Dump(ST_Multi(STX_Extract(ST_Intersection(tv1.geom, tv2.geom), 1)))).geom::geometry(Point, {{SRID_PROYECTO}}) AS geom
 FROM jcm3.tramovial tv1
 JOIN jcm3.tramovial tv2 ON ST_Intersects(tv1.geom, tv2.geom) AND tv1.gid < tv2.gid
 WHERE ST_Relate(tv1.geom, tv2.geom, '0********')
@@ -512,7 +512,7 @@ SELECT
     b1.gid AS building_gid1, 
     b2.gid AS building_gid2,
     ST_Area(ST_Intersection(b1.geom, b2.geom)) AS area_solape,
-    ST_Multi(STX_Extract(ST_Intersection(b1.geom, b2.geom), 3))::geometry(MultiPolygon, 25830) AS geom
+    ST_Multi(STX_Extract(ST_Intersection(b1.geom, b2.geom), 3))::geometry(MultiPolygon, {{SRID_PROYECTO}}) AS geom
 FROM jcm3.building b1, jcm3.building b2
 WHERE ST_Overlaps(b1.geom, b2.geom) AND b1.gid < b2.gid;
 

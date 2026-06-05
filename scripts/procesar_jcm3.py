@@ -7,7 +7,7 @@ import psycopg2
 SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.append(str(SCRIPTS_DIR))
 
-from config import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
+from config import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, SRID_PROYECTO
 
 SQL_FILE_PATH = SCRIPTS_DIR / "procesar_jcm3.sql"
 
@@ -21,9 +21,11 @@ def procesar_analisis_jcm3():
         print(f"[ERROR] No se encuentra el archivo SQL de análisis: {SQL_FILE_PATH}")
         sys.exit(1)
 
-    print(f"Leyendo {SQL_FILE_PATH.name}...")
+    print(f"Leyendo {SQL_FILE_PATH.name} y reemplazando marcador SRID (SRID: {SRID_PROYECTO})...")
     with open(SQL_FILE_PATH, "r", encoding="utf-8") as f:
         sql_content = f.read()
+
+    sql_content = sql_content.replace("{{SRID_PROYECTO}}", str(SRID_PROYECTO))
 
     # 2. Conectar a PostGIS
     conn = None

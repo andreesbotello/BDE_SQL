@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 import psycopg2
-from config import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, CODIGO_MUNICIPIO
+from config import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, CODIGO_MUNICIPIO, SRID_PROYECTO
 
 # Project directory structure
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -20,12 +20,13 @@ def procesar_modelo_jcm2():
         print(f"[ERROR] No se encuentra el archivo SQL de procesamiento: {SQL_FILE_PATH}")
         sys.exit(1)
 
-    print(f"Leyendo {SQL_FILE_PATH.name} y reemplazando marcador de municipio (CODIGO: {CODIGO_MUNICIPIO})...")
+    print(f"Leyendo {SQL_FILE_PATH.name} y reemplazando marcadores de municipio (CODIGO: {CODIGO_MUNICIPIO}) y SRID (SRID: {SRID_PROYECTO})...")
     with open(SQL_FILE_PATH, "r", encoding="utf-8") as f:
         sql_content = f.read()
 
-    # Dynamic replacement of the municipality code placeholder
+    # Dynamic replacement of the placeholders
     sql_content = sql_content.replace("{{CODIGO_MUNICIPIO}}", CODIGO_MUNICIPIO)
+    sql_content = sql_content.replace("{{SRID_PROYECTO}}", str(SRID_PROYECTO))
 
     # 2. Connect to PostGIS database and run the main SQL sequence
     conn = None
@@ -88,6 +89,7 @@ def procesar_modelo_jcm2():
             print(f"\nEjecutando informe de limpieza y depuración desde {REPORT_FILE_PATH.name}...")
             with open(REPORT_FILE_PATH, "r", encoding="utf-8") as f:
                 report_content = f.read().replace("{{CODIGO_MUNICIPIO}}", CODIGO_MUNICIPIO)
+                report_content = report_content.replace("{{SRID_PROYECTO}}", str(SRID_PROYECTO))
             
             cur.execute(report_content)
             limpieza_resultados = cur.fetchall()
