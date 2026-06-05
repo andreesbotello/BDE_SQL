@@ -523,9 +523,13 @@ WHERE ST_Overlaps(b1.geom, b2.geom) AND b1.gid < b2.gid;
 
 -- 8.1.1. ¿Cuántas parcelas tienen algún edificio en su interior?
 CREATE OR REPLACE VIEW jcm3.vista_q8_1_1 AS
-SELECT COUNT(DISTINCT cp.gid) AS total_parcelas_con_edificios
+SELECT COUNT(*) AS total_parcelas_con_edificios
 FROM jcm2.cadastralparcel cp
-JOIN jcm3.building b ON ST_Intersects(cp.geom, b.geom);
+WHERE EXISTS (
+    SELECT 1 
+    FROM jcm3.building b 
+    WHERE ST_Intersects(cp.geom, b.geom)
+);
 
 -- 8.1.2. ¿Cuántas parcelas no tienen ningún edificio en su interior (sin GROUP BY)?
 CREATE OR REPLACE VIEW jcm3.vista_q8_1_2 AS
@@ -557,14 +561,13 @@ WHERE NOT EXISTS (
       AND ST_DWithin(b1.geom, b2.geom, 100)
 );
 
--- 8.3. Área total de edificios por tipo de suelo SIOSE (top 5 de más área, con descripción)
 CREATE OR REPLACE VIEW jcm3.vista_q8_3 AS
 SELECT 
     s.codiige,
     c.descripcion AS suelo_descripcion,
     ROUND(SUM(ST_Area(ST_Intersection(b.geom, s.geom)))::numeric, 2) AS area_edificada_m2
 FROM jcm3.building b
-JOIN jcm2.siose_pol s ON ST_Intersects(b.geom, s.geom)
+JOIN jcm2.siose_pol s ON ST_Intersects(b.geom, s.geom) AND NOT ST_Touches(b.geom, s.geom)
 LEFT JOIN jcm2.siose_codiige c ON s.codiige = c.codiige
 GROUP BY s.codiige, c.descripcion
 ORDER BY area_edificada_m2 DESC
