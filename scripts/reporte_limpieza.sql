@@ -30,7 +30,7 @@ SELECT
     filtradas_escala AS micro,
     (corruptas_descartadas + filtradas_conversion_2d) AS incoherencias
 FROM jcm2.log_calidad_geometrias
-WHERE tabla <> 'ttmm'
+WHERE tabla <> 'municipio'
 ORDER BY 
     CASE 
         WHEN tabla = 'building' THEN 1

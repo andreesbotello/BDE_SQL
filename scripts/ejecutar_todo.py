@@ -30,6 +30,7 @@ SCRIPTS = [
     ROOT / "scripts" / "inicializar_db.py",
     ROOT / "scripts" / "importar_jcm1.py",
     ROOT / "scripts" / "procesar_jcm2.py",
+    ROOT / "scripts" / "ejecutar_consultas_calidad.py",
     ROOT / "scripts" / "procesar_jcm3.py",
 ]
 

@@ -14,7 +14,7 @@ DROP TABLE IF EXISTS jcm2.tramocurso CASCADE;
 DROP TABLE IF EXISTS jcm2.siose_pol CASCADE;
 DROP TABLE IF EXISTS jcm2.siose_codiige CASCADE;
 DROP TABLE IF EXISTS jcm2.siose_hilucs CASCADE;
-DROP TABLE IF EXISTS jcm2.ttmm CASCADE;
+DROP TABLE IF EXISTS jcm2.municipio CASCADE;
 DROP TABLE IF EXISTS jcm2.log_calidad_geometrias CASCADE;
 DROP TABLE IF EXISTS jcm2.log_detalle_calidad CASCADE;
 
@@ -52,8 +52,8 @@ CREATE TABLE jcm2.log_detalle_calidad (
 -- 2. CREACIÓN DE TABLAS DESTINO CON EL SRS DEL PROYECTO ({{SRID_PROYECTO}})
 -- ============================================================================
 
--- 2.1. Término Municipal (ttmm)
-CREATE TABLE jcm2.ttmm (
+-- 2.1. Término Municipal (municipio)
+CREATE TABLE jcm2.municipio (
     gid serial PRIMARY KEY,
     inspireid varchar,
     natcode varchar,
@@ -133,9 +133,9 @@ CREATE TABLE jcm2.siose_pol (
 -- 3. INSERCIÓN DE DATOS PASO A PASO (PROCESAMIENTO, DEPURACIÓN Y LOGS)
 -- ============================================================================
 
--- 3.1. Procesamiento de ttmm (Término Municipal)
+-- 3.1. Procesamiento de municipio (Término Municipal)
 -- ----------------------------------------------------------------------------
-DELETE FROM jcm2.log_calidad_geometrias WHERE tabla = 'ttmm';
+DELETE FROM jcm2.log_calidad_geometrias WHERE tabla = 'municipio';
 
 WITH candidatos AS (
     SELECT
@@ -146,8 +146,8 @@ WITH candidatos AS (
         ST_SRID(geom)                             AS srid_raw,
         ST_Transform(geom, {{SRID_PROYECTO}})     AS geom_proj
     FROM jcm1.ttmm
-    WHERE (natcode = '3417' || SUBSTRING('{{CODIGO_MUNICIPIO}}', 1, 2) || '{{CODIGO_MUNICIPIO}}'
-       OR natcode LIKE '%' || '{{CODIGO_MUNICIPIO}}')
+    WHERE (natcode = '3401' || SUBSTRING('{{CODIGO_MUNICIPIO}}', 1, 2) || '{{CODIGO_MUNICIPIO}}'
+        OR natcode = '3417' || SUBSTRING('{{CODIGO_MUNICIPIO}}', 1, 2) || '{{CODIGO_MUNICIPIO}}')
       AND geom IS NOT NULL
 ),
 saneados AS (
@@ -181,7 +181,7 @@ clasificados AS (
     FROM saneados
 ),
 insert_destino AS (
-    INSERT INTO jcm2.ttmm (inspireid, natcode, nameunit, geom)
+    INSERT INTO jcm2.municipio (inspireid, natcode, nameunit, geom)
     SELECT inspireid, natcode, nameunit, geom_final
     FROM clasificados
     WHERE es_apta
@@ -190,7 +190,7 @@ insert_destino AS (
 insert_auditoria AS (
     INSERT INTO jcm2.log_detalle_calidad (tabla, gml_id, srid_original, es_valida_original, valida_post_corr, vacia_post_corr, motivo_descarte, geom_original)
     SELECT 
-        'ttmm', inspireid, srid_raw, valida_en_proj, valida_final, vacia_final,
+        'municipio', inspireid, srid_raw, valida_en_proj, valida_final, vacia_final,
         CASE 
             WHEN es_corrupta THEN 'corrupta'
             WHEN es_rota_conversion THEN 'rota_conversion'
@@ -219,13 +219,14 @@ INSERT INTO jcm2.log_calidad_geometrias (
     filtradas_conversion_2d, filtradas_escala, insertadas_destino, notas
 )
 SELECT
-    'ttmm', now(), srid_raw, {{SRID_PROYECTO}}, total_origen_buffer,
+    'municipio', now(), srid_raw, {{SRID_PROYECTO}}, total_origen_buffer,
     originales_validas, originales_invalidas, reparadas_exito, corruptas_descartadas,
     filtradas_conversion_2d, filtradas_escala, insertadas_destino, NULL
 FROM metricas;
 
--- Índice espacial inmediato para ttmm (crítico para las búsquedas del buffer en las siguientes capas)
-CREATE INDEX jcm2_ttmm_geom_idx ON jcm2.ttmm USING gist(geom);
+-- Índice espacial inmediato para municipio (crítico para las búsquedas del buffer en las siguientes capas)
+CREATE INDEX jcm2_municipio_geom_idx ON jcm2.municipio USING gist(geom);
+ANALYZE jcm2.municipio;
 
 
 -- 3.2. Procesamiento de Edificios (building)
@@ -242,10 +243,10 @@ WITH candidatos AS (
         ST_SRID(b.geom)                           AS srid_raw,
         ST_Transform(b.geom, {{SRID_PROYECTO}})   AS geom_proj
     FROM jcm1.building b
-    CROSS JOIN jcm2.ttmm m
+    CROSS JOIN (SELECT ST_Union(geom) AS geom FROM jcm2.municipio) m
     WHERE b.geom IS NOT NULL
       AND ST_DWithin(
-          CASE WHEN ST_SRID(b.geom) = {{SRID_PROYECTO}} THEN b.geom ELSE ST_Transform(b.geom, {{SRID_PROYECTO}}) END,
+          ST_Transform(b.geom, {{SRID_PROYECTO}}),
           m.geom,
           500
       )
@@ -339,7 +340,7 @@ SELECT
     filtradas_conversion_2d, filtradas_escala, insertadas_destino,
     CASE
         WHEN EXISTS (
-            SELECT 1 FROM jcm2.building
+            SELECT 1 FROM clasificados
             WHERE current_use_in IS NOT NULL AND currentuse IS NULL
         )
         THEN 'ADVERTENCIA: existen valores de current_use_in sin mapeo INSPIRE.'
@@ -361,6 +362,7 @@ BEGIN
     RAISE NOTICE 'building · % procesados → % insertados', r.total_origen_buffer, r.insertadas_destino;
 END;
 $$;
+ANALYZE jcm2.building;
 
 
 -- 3.3. Procesamiento de Partes de Edificios (buildingpart)
@@ -376,10 +378,10 @@ WITH candidatos AS (
         ST_SRID(bp.geom)                          AS srid_raw,
         ST_Transform(bp.geom, {{SRID_PROYECTO}})  AS geom_proj
     FROM jcm1.buildingpart bp
-    CROSS JOIN jcm2.ttmm m
+    CROSS JOIN (SELECT ST_Union(geom) AS geom FROM jcm2.municipio) m
     WHERE bp.geom IS NOT NULL
       AND ST_DWithin(
-          CASE WHEN ST_SRID(bp.geom) = {{SRID_PROYECTO}} THEN bp.geom ELSE ST_Transform(bp.geom, {{SRID_PROYECTO}}) END,
+          ST_Transform(bp.geom, {{SRID_PROYECTO}}),
           m.geom,
           500
       )
@@ -472,6 +474,7 @@ BEGIN
     RAISE NOTICE 'buildingpart · % procesados → % insertados', r.total_origen_buffer, r.insertadas_destino;
 END;
 $$;
+ANALYZE jcm2.buildingpart;
 
 
 -- 3.4. Procesamiento de Parcelas Catastrales (cadastralparcel)
@@ -487,10 +490,10 @@ WITH candidatos AS (
         ST_SRID(cp.geom)                          AS srid_raw,
         ST_Transform(cp.geom, {{SRID_PROYECTO}})  AS geom_proj
     FROM jcm1.cadastralparcel cp
-    CROSS JOIN jcm2.ttmm m
+    CROSS JOIN (SELECT ST_Union(geom) AS geom FROM jcm2.municipio) m
     WHERE cp.geom IS NOT NULL
       AND ST_DWithin(
-          CASE WHEN ST_SRID(cp.geom) = {{SRID_PROYECTO}} THEN cp.geom ELSE ST_Transform(cp.geom, {{SRID_PROYECTO}}) END,
+          ST_Transform(cp.geom, {{SRID_PROYECTO}}),
           m.geom,
           500
       )
@@ -583,6 +586,7 @@ BEGIN
     RAISE NOTICE 'cadastralparcel · % procesados → % insertados', r.total_origen_buffer, r.insertadas_destino;
 END;
 $$;
+ANALYZE jcm2.cadastralparcel;
 
 
 -- 3.5. Procesamiento de Tramos Viales (tramovial)
@@ -600,10 +604,10 @@ WITH candidatos AS (
         ST_SRID(tv.geom)                          AS srid_raw,
         ST_Transform(tv.geom, {{SRID_PROYECTO}})  AS geom_proj
     FROM jcm1.tramovial tv
-    CROSS JOIN jcm2.ttmm m
+    CROSS JOIN (SELECT ST_Union(geom) AS geom FROM jcm2.municipio) m
     WHERE tv.geom IS NOT NULL
       AND ST_DWithin(
-          CASE WHEN ST_SRID(tv.geom) = {{SRID_PROYECTO}} THEN tv.geom ELSE ST_Transform(tv.geom, {{SRID_PROYECTO}}) END,
+          ST_Transform(tv.geom, {{SRID_PROYECTO}}),
           m.geom,
           500
       )
@@ -637,8 +641,8 @@ clasificados AS (
         (NOT valida_en_proj AND (NOT valida_final OR vacia_final))     AS es_corrupta,
         -- Non-simple or invalid/empty lines count under es_rota_conversion
         (valida_final AND NOT vacia_final AND (geom_final IS NULL OR NOT ST_IsValid(geom_final) OR ST_IsEmpty(geom_final) OR NOT ST_IsSimple(geom_final))) AS es_rota_conversion,
-        (valida_final AND NOT vacia_final AND geom_final IS NOT NULL AND ST_IsValid(geom_final) AND NOT ST_IsEmpty(geom_final) AND ST_IsSimple(geom_final) AND ST_Length(geom_final) < 0.5) AS es_filtrada_escala,
-        (valida_final AND NOT vacia_final AND geom_final IS NOT NULL AND ST_IsValid(geom_final) AND NOT ST_IsEmpty(geom_final) AND ST_IsSimple(geom_final) AND ST_Length(geom_final) >= 0.5) AS es_apta
+        FALSE                                                                                                                                          AS es_filtrada_escala,
+        (valida_final AND NOT vacia_final AND geom_final IS NOT NULL AND ST_IsValid(geom_final) AND NOT ST_IsEmpty(geom_final) AND ST_IsSimple(geom_final)) AS es_apta
     FROM saneados
 ),
 insert_destino AS (
@@ -699,6 +703,7 @@ BEGIN
     RAISE NOTICE 'tramovial · % procesados → % insertados', r.total_origen_buffer, r.insertadas_destino;
 END;
 $$;
+ANALYZE jcm2.tramovial;
 
 
 -- 3.6. Procesamiento de Portales y PKs (portalpk)
@@ -715,10 +720,10 @@ WITH candidatos AS (
         ST_SRID(pk.geom)                          AS srid_raw,
         ST_Transform(pk.geom, {{SRID_PROYECTO}})  AS geom_proj
     FROM jcm1.portalpk pk
-    CROSS JOIN jcm2.ttmm m
+    CROSS JOIN (SELECT ST_Union(geom) AS geom FROM jcm2.municipio) m
     WHERE pk.geom IS NOT NULL
       AND ST_DWithin(
-          CASE WHEN ST_SRID(pk.geom) = {{SRID_PROYECTO}} THEN pk.geom ELSE ST_Transform(pk.geom, {{SRID_PROYECTO}}) END,
+          ST_Transform(pk.geom, {{SRID_PROYECTO}}),
           m.geom,
           500
       )
@@ -812,6 +817,7 @@ BEGIN
     RAISE NOTICE 'portalpk · % procesados → % insertados', r.total_origen_buffer, r.insertadas_destino;
 END;
 $$;
+ANALYZE jcm2.portalpk;
 
 
 -- 3.7. Procesamiento de Red de Hidrografía (tramocurso)
@@ -827,10 +833,10 @@ WITH candidatos AS (
         ST_SRID(tc.geom)                          AS srid_raw,
         ST_Transform(tc.geom, {{SRID_PROYECTO}})  AS geom_proj
     FROM jcm1.tramocurso tc
-    CROSS JOIN jcm2.ttmm m
+    CROSS JOIN (SELECT ST_Union(geom) AS geom FROM jcm2.municipio) m
     WHERE tc.geom IS NOT NULL
       AND ST_DWithin(
-          CASE WHEN ST_SRID(tc.geom) = {{SRID_PROYECTO}} THEN tc.geom ELSE ST_Transform(tc.geom, {{SRID_PROYECTO}}) END,
+          ST_Transform(tc.geom, {{SRID_PROYECTO}}),
           m.geom,
           500
       )
@@ -861,8 +867,8 @@ clasificados AS (
         vacia_final,
         (NOT valida_en_proj AND (NOT valida_final OR vacia_final))     AS es_corrupta,
         (valida_final AND NOT vacia_final AND (geom_final IS NULL OR NOT ST_IsValid(geom_final) OR ST_IsEmpty(geom_final))) AS es_rota_conversion,
-        (valida_final AND NOT vacia_final AND geom_final IS NOT NULL AND ST_IsValid(geom_final) AND NOT ST_IsEmpty(geom_final) AND ST_Length(geom_final) < 0.5) AS es_filtrada_escala,
-        (valida_final AND NOT vacia_final AND geom_final IS NOT NULL AND ST_IsValid(geom_final) AND NOT ST_IsEmpty(geom_final) AND ST_Length(geom_final) >= 0.5) AS es_apta
+        FALSE                                                                                                               AS es_filtrada_escala,
+        (valida_final AND NOT vacia_final AND geom_final IS NOT NULL AND ST_IsValid(geom_final) AND NOT ST_IsEmpty(geom_final)) AS es_apta
     FROM saneados
 ),
 insert_destino AS (
@@ -923,6 +929,7 @@ BEGIN
     RAISE NOTICE 'tramocurso · % procesados → % insertados', r.total_origen_buffer, r.insertadas_destino;
 END;
 $$;
+ANALYZE jcm2.tramocurso;
 
 
 -- 3.8. Procesamiento de SIOSE Polígonos (siose_pol)
@@ -938,10 +945,10 @@ WITH candidatos AS (
         ST_SRID(s.geom)                           AS srid_raw,
         ST_Transform(s.geom, {{SRID_PROYECTO}})   AS geom_proj
     FROM jcm1.siose_pol s
-    CROSS JOIN jcm2.ttmm m
+    CROSS JOIN (SELECT ST_Union(geom) AS geom FROM jcm2.municipio) m
     WHERE s.geom IS NOT NULL
       AND ST_DWithin(
-          CASE WHEN ST_SRID(s.geom) = {{SRID_PROYECTO}} THEN s.geom ELSE ST_Transform(s.geom, {{SRID_PROYECTO}}) END,
+          ST_Transform(s.geom, {{SRID_PROYECTO}}),
           m.geom,
           500
       )
@@ -1038,12 +1045,97 @@ BEGIN
     RAISE NOTICE 'siose_pol · % procesados → % insertados', r.total_origen_buffer, r.insertadas_destino;
 END;
 $$;
+ANALYZE jcm2.siose_pol;
 
 
 -- 3.9. Copiar Tablas Alfanuméricas SIOSE
 -- ============================================================================
-CREATE TABLE jcm2.siose_codiige AS SELECT * FROM jcm1.siose_codiige;
-CREATE TABLE jcm2.siose_hilucs AS SELECT * FROM jcm1.siose_hilucs;
+CREATE TABLE jcm2.siose_codiige (
+    codiige integer,
+    descripcion varchar,
+    color_html varchar(7)
+);
+INSERT INTO jcm2.siose_codiige (codiige, descripcion)
+SELECT codiige, descripcion FROM jcm1.siose_codiige;
+
+CREATE TABLE jcm2.siose_hilucs (
+    hilucs integer,
+    descripcion varchar,
+    color_html varchar(7)
+);
+INSERT INTO jcm2.siose_hilucs (hilucs, descripcion)
+SELECT hilucs, descripcion FROM jcm1.siose_hilucs;
+
+-- Mapeo de colores oficiales SIOSE desde los archivos SLD
+UPDATE jcm2.siose_codiige SET color_html = CASE codiige
+    WHEN 111 THEN '#e65069'
+    WHEN 112 THEN '#f06e82'
+    WHEN 113 THEN '#ff8296'
+    WHEN 114 THEN '#64b482'
+    WHEN 121 THEN '#f27961'
+    WHEN 122 THEN '#47ccb6'
+    WHEN 123 THEN '#a07878'
+    WHEN 130 THEN '#b679f2'
+    WHEN 140 THEN '#f2aace'
+    WHEN 150 THEN '#f5a27a'
+    WHEN 161 THEN '#cc3d6d'
+    WHEN 162 THEN '#e6cccc'
+    WHEN 163 THEN '#e6cce6'
+    WHEN 171 THEN '#a3a3bf'
+    WHEN 172 THEN '#70694c'
+    WHEN 210 THEN '#f2e8b6'
+    WHEN 220 THEN '#ffffd2'
+    WHEN 231 THEN '#e6aa5a'
+    WHEN 232 THEN '#e6aa5a'
+    WHEN 233 THEN '#c8a68c'
+    WHEN 234 THEN '#f0e678'
+    WHEN 235 THEN '#c8aa50'
+    WHEN 236 THEN '#e6bd5f'
+    WHEN 240 THEN '#eded5f'
+    WHEN 250 THEN '#edd377'
+    WHEN 260 THEN '#dded8e'
+    WHEN 311 THEN '#50b051'
+    WHEN 312 THEN '#109c69'
+    WHEN 313 THEN '#38a65d'
+    WHEN 320 THEN '#beed5f'
+    WHEN 330 THEN '#82d957'
+    WHEN 340 THEN '#58bf43'
+    WHEN 351 THEN '#f0c864'
+    WHEN 352 THEN '#d9d6c7'
+    WHEN 353 THEN '#3c503c'
+    WHEN 354 THEN '#d2f2c2'
+    WHEN 411 THEN '#a6a6ff'
+    WHEN 412 THEN '#6464ff'
+    WHEN 413 THEN '#ccccff'
+    WHEN 414 THEN '#e6e6ff'
+    WHEN 511 THEN '#61aaf2'
+    WHEN 512 THEN '#82bef2'
+    WHEN 513 THEN '#91d2f2'
+    WHEN 514 THEN '#4696ff'
+    WHEN 515 THEN '#e6f2ff'
+    WHEN 516 THEN '#a6e6cc'
+    ELSE color_html
+END;
+
+UPDATE jcm2.siose_hilucs SET color_html = CASE hilucs
+    WHEN 110 THEN '#ca5698'
+    WHEN 120 THEN '#91cc61'
+    WHEN 130 THEN '#4fd840'
+    WHEN 140 THEN '#5c1dc8'
+    WHEN 200 THEN '#2c65ce'
+    WHEN 310 THEN '#2424d2'
+    WHEN 330 THEN '#e89b52'
+    WHEN 340 THEN '#dd2f14'
+    WHEN 410 THEN '#b736ea'
+    WHEN 430 THEN '#4dd59f'
+    WHEN 500 THEN '#88d0ee'
+    WHEN 610 THEN '#c6dd68'
+    WHEN 620 THEN '#64d0cb'
+    WHEN 631 THEN '#db52d0'
+    WHEN 632 THEN '#54c971'
+    WHEN 660 THEN '#dc4868'
+    ELSE color_html
+END;
 
 
 -- 4. VALIDACIÓN Y CORRECCIÓN GEOMÉTRICA (ST_MakeValid)
@@ -1077,14 +1169,25 @@ CREATE INDEX jcm2_buildingpart_gml_id_prefix_idx ON jcm2.buildingpart (LEFT(gml_
 ALTER TABLE jcm2.siose_codiige ADD CONSTRAINT pk_siose_codiige PRIMARY KEY (codiige);
 ALTER TABLE jcm2.siose_hilucs ADD CONSTRAINT pk_siose_hilucs PRIMARY KEY (hilucs);
 
+-- Ejecutar ANALYZE en todas las tablas para actualizar estadísticas de índices
+ANALYZE jcm2.municipio;
+ANALYZE jcm2.building;
+ANALYZE jcm2.buildingpart;
+ANALYZE jcm2.cadastralparcel;
+ANALYZE jcm2.tramovial;
+ANALYZE jcm2.portalpk;
+ANALYZE jcm2.tramocurso;
+ANALYZE jcm2.siose_pol;
+ANALYZE jcm2.log_detalle_calidad;
+
 
 -- 6. ADICIÓN DE RESTRICCIONES (CONSTRAINTS) SEMÁNTICAS Y GEOMÉTRICAS
 -- ============================================================================
 -- Nota: Uso de NOT VALID seguido de VALIDATE CONSTRAINT para optimización de bloqueos.
 
 -- 6.1. Restricciones de Geometría Válida (ST_IsValid)
-ALTER TABLE jcm2.ttmm ADD CONSTRAINT chk_ttmm_geom_valid CHECK (ST_IsValid(geom)) NOT VALID;
-ALTER TABLE jcm2.ttmm VALIDATE CONSTRAINT chk_ttmm_geom_valid;
+ALTER TABLE jcm2.municipio ADD CONSTRAINT chk_municipio_geom_valid CHECK (ST_IsValid(geom)) NOT VALID;
+ALTER TABLE jcm2.municipio VALIDATE CONSTRAINT chk_municipio_geom_valid;
 
 ALTER TABLE jcm2.building ADD CONSTRAINT chk_building_geom_valid CHECK (ST_IsValid(geom)) NOT VALID;
 ALTER TABLE jcm2.building VALIDATE CONSTRAINT chk_building_geom_valid;
@@ -1120,12 +1223,7 @@ ALTER TABLE jcm2.cadastralparcel VALIDATE CONSTRAINT chk_cadastralparcel_geom_ar
 
 ALTER TABLE jcm2.siose_pol ADD CONSTRAINT chk_siose_pol_geom_area CHECK (ST_Area(geom) >= 0.5) NOT VALID;
 ALTER TABLE jcm2.siose_pol VALIDATE CONSTRAINT chk_siose_pol_geom_area;
-
-ALTER TABLE jcm2.tramovial ADD CONSTRAINT chk_tramovial_geom_length CHECK (ST_Length(geom) >= 0.5) NOT VALID;
-ALTER TABLE jcm2.tramovial VALIDATE CONSTRAINT chk_tramovial_geom_length;
-
-ALTER TABLE jcm2.tramocurso ADD CONSTRAINT chk_tramocurso_geom_length CHECK (ST_Length(geom) >= 0.5) NOT VALID;
-ALTER TABLE jcm2.tramocurso VALIDATE CONSTRAINT chk_tramocurso_geom_length;
+-- Restricciones de longitud mínima eliminadas para preservar conectividad en redes lineales (tramovial y tramocurso)
 
 -- 6.4. Restricciones de Campos Alfanuméricos Positivos
 ALTER TABLE jcm2.building ADD CONSTRAINT chk_building_units CHECK (numberofbuildingunits >= 0) NOT VALID;

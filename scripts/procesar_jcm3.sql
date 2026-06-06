@@ -14,6 +14,11 @@ DROP VIEW IF EXISTS jcm3.vista_q8_1_3 CASCADE;
 DROP VIEW IF EXISTS jcm3.vista_q8_1_2 CASCADE;
 DROP VIEW IF EXISTS jcm3.vista_q8_1_1 CASCADE;
 DROP VIEW IF EXISTS jcm3.parcelas_candidatas_centro CASCADE;
+DROP VIEW IF EXISTS jcm3.analisis_c5_portales CASCADE;
+DROP VIEW IF EXISTS jcm3.analisis_c4_urbano CASCADE;
+DROP VIEW IF EXISTS jcm3.analisis_c3_inundacion CASCADE;
+DROP VIEW IF EXISTS jcm3.analisis_c2_acceso CASCADE;
+DROP VIEW IF EXISTS jcm3.analisis_c1_area_vacias CASCADE;
 DROP VIEW IF EXISTS jcm3.building_solapes_intersecciones CASCADE;
 DROP VIEW IF EXISTS jcm3.building_solapes_agrupada CASCADE;
 DROP VIEW IF EXISTS jcm3.building_solapes_agrupada_1m2 CASCADE;
@@ -42,6 +47,8 @@ DELETE FROM jcm2.building WHERE gml_id = 'TEST_GML_ID_SOLAPADO';
 CREATE TABLE jcm3.building AS SELECT * FROM jcm2.building;
 ALTER TABLE jcm3.building ADD PRIMARY KEY (gid);
 CREATE INDEX ON jcm3.building USING gist(geom);
+ALTER TABLE jcm3.building ADD COLUMN requiere_edicion_manual boolean DEFAULT false;
+ALTER TABLE jcm3.building ADD COLUMN motivo_inconsistencia varchar;
 
 -- Corrección automática de solapes menores a 0.5 m2 mediante snapping/diferencia
 CREATE OR REPLACE FUNCTION jcm3.fn_corregir_solapes_edificios()
@@ -70,10 +77,27 @@ $$ LANGUAGE plpgsql;
 
 SELECT jcm3.fn_corregir_solapes_edificios();
 
+-- Identificar y marcar solapes persistentes en edificios que no se pudieron corregir automáticamente
+WITH solapes_restantes AS (
+    SELECT DISTINCT b1.gid
+    FROM jcm3.building b1
+    JOIN jcm3.building b2 ON ST_Overlaps(b1.geom, b2.geom) AND b1.gid <> b2.gid
+)
+UPDATE jcm3.building b
+SET requiere_edicion_manual = true,
+    motivo_inconsistencia = 'Solape con edificación/es: ' || (
+        SELECT string_agg(b2.gml_id, ', ')
+        FROM jcm3.building b2
+        WHERE ST_Overlaps(b.geom, b2.geom) AND b.gid <> b2.gid
+    )
+WHERE gid IN (SELECT gid FROM solapes_restantes);
+
 -- B. Capa de Vías Corregidas (tramovial) y reportes de corrección
 CREATE TABLE jcm3.tramovial AS SELECT * FROM jcm2.tramovial;
 ALTER TABLE jcm3.tramovial ADD PRIMARY KEY (gid);
 CREATE INDEX ON jcm3.tramovial USING gist(geom);
+ALTER TABLE jcm3.tramovial ADD COLUMN requiere_edicion_manual boolean DEFAULT false;
+ALTER TABLE jcm3.tramovial ADD COLUMN motivo_inconsistencia varchar;
 
 CREATE TABLE jcm3.vial_edificio_reporte (
     tv_gid integer PRIMARY KEY,
@@ -419,6 +443,31 @@ $$ LANGUAGE plpgsql;
 
 SELECT jcm3.fn_corregir_stubs();
 
+-- 1. Marcar intersecciones vial-edificio no resueltas en viales
+UPDATE jcm3.tramovial tv
+SET requiere_edicion_manual = true,
+    motivo_inconsistencia = COALESCE(tv.motivo_inconsistencia || '; ', '') || 'Intersección edificación (' || r.estado || ' con ' || b.gml_id || ')'
+FROM jcm3.vial_edificio_reporte r
+JOIN jcm3.building b ON r.b_gid = b.gid
+WHERE tv.gid = r.tv_gid AND r.estado LIKE 'No Resuelto%';
+
+-- 2. Marcar cruces viales sin nodos en viales
+WITH cruces_sin_nodos AS (
+    SELECT DISTINCT tv1.gid
+    FROM jcm3.tramovial tv1
+    JOIN jcm3.tramovial tv2 ON ST_Intersects(tv1.geom, tv2.geom) AND tv1.gid <> tv2.gid
+    WHERE ST_Relate(tv1.geom, tv2.geom, '0********')
+)
+UPDATE jcm3.tramovial tv
+SET requiere_edicion_manual = true,
+    motivo_inconsistencia = COALESCE(tv.motivo_inconsistencia || '; ', '') || 'Cruce sin nodo con tramo/s: ' || (
+        SELECT string_agg(tv2.id_tramo, ', ')
+        FROM jcm3.tramovial tv2
+        WHERE ST_Intersects(tv.geom, tv2.geom) AND tv.gid <> tv2.gid
+          AND ST_Relate(tv.geom, tv2.geom, '0********')
+    )
+WHERE gid IN (SELECT gid FROM cruces_sin_nodos);
+
 
 -- ============================================================================
 -- 3. REGLAS TOPOLÓGICAS AUDITADAS Y FILTRADAS (SECCIÓN 7)
@@ -614,43 +663,62 @@ LIMIT 5;
 -- ============================================================================
 -- 5. EJERCICIO DE ANÁLISIS ESPACIAL MULTICRITERIO CORREGIDO (SECCIÓN 9)
 -- ============================================================================
+CREATE OR REPLACE VIEW jcm3.analisis_c1_area_vacias AS
+SELECT cp.gid, cp.gml_id, cp.localid, cp.areavalue, cp.geom
+FROM jcm2.cadastralparcel cp
+WHERE cp.areavalue > 1500
+  AND NOT EXISTS (
+      SELECT 1 
+      FROM jcm3.building b 
+      WHERE ST_Intersects(cp.geom, b.geom)
+  );
+
+CREATE OR REPLACE VIEW jcm3.analisis_c2_acceso AS
+SELECT cp.gid, cp.gml_id, cp.geom
+FROM jcm2.cadastralparcel cp
+WHERE EXISTS (
+    SELECT 1 
+    FROM jcm3.tramovial tv 
+    WHERE ST_DWithin(cp.geom, tv.geom, 10) 
+      AND tv.firmed = 'Pavimentado'
+);
+
+CREATE OR REPLACE VIEW jcm3.analisis_c3_inundacion AS
+SELECT cp.gid, cp.gml_id, cp.geom
+FROM jcm2.cadastralparcel cp
+WHERE NOT EXISTS (
+    SELECT 1 
+    FROM jcm2.tramocurso tc 
+    WHERE ST_DWithin(cp.geom, tc.geom, 100)
+);
+
+CREATE OR REPLACE VIEW jcm3.analisis_c4_urbano AS
+SELECT DISTINCT cp.gid, cp.gml_id, cp.geom
+FROM jcm2.cadastralparcel cp
+JOIN jcm2.siose_pol s ON ST_Intersects(cp.geom, s.geom)
+WHERE s.codiige BETWEEN 111 AND 140;
+
+CREATE OR REPLACE VIEW jcm3.analisis_c5_portales AS
+SELECT cp.gid, cp.gml_id, cp.geom
+FROM jcm2.cadastralparcel cp
+WHERE (
+    SELECT COUNT(*) 
+    FROM jcm2.portalpk pk 
+    WHERE ST_DWithin(cp.geom, pk.geom, 300)
+) >= 10;
+
 CREATE OR REPLACE VIEW jcm3.parcelas_candidatas_centro AS
 SELECT 
-    cp.gid,
-    cp.gml_id AS parcela_gml_id,
-    cp.localid AS parcela_localid,
-    ROUND(cp.areavalue::numeric, 2) AS area_parcela_m2,
-    cp.geom
-FROM jcm2.cadastralparcel cp
-WHERE 
-    cp.areavalue > 1500
-    AND NOT EXISTS (
-        SELECT 1 
-        FROM jcm3.building b 
-        WHERE ST_Intersects(cp.geom, b.geom)
-    )
-    AND EXISTS (
-        SELECT 1 
-        FROM jcm3.tramovial tv 
-        WHERE ST_DWithin(cp.geom, tv.geom, 10) 
-          AND tv.firmed = 'Pavimentado'
-    )
-    AND NOT EXISTS (
-        SELECT 1 
-        FROM jcm2.tramocurso tc 
-        WHERE ST_DWithin(cp.geom, tc.geom, 100)
-    )
-    AND EXISTS (
-        SELECT 1 
-        FROM jcm2.siose_pol s
-        WHERE ST_Intersects(cp.geom, s.geom)
-          AND s.codiige BETWEEN 111 AND 140
-    )
-    AND (
-        SELECT COUNT(*) 
-        FROM jcm2.portalpk pk 
-        WHERE ST_DWithin(cp.geom, pk.geom, 300)
-    ) >= 10;
+    c1.gid,
+    c1.gml_id AS parcela_gml_id,
+    c1.localid AS parcela_localid,
+    ROUND(c1.areavalue::numeric, 2) AS area_parcela_m2,
+    c1.geom
+FROM jcm3.analisis_c1_area_vacias c1
+JOIN jcm3.analisis_c2_acceso c2 ON c1.gid = c2.gid
+JOIN jcm3.analisis_c3_inundacion c3 ON c1.gid = c3.gid
+JOIN jcm3.analisis_c4_urbano c4 ON c1.gid = c4.gid
+JOIN jcm3.analisis_c5_portales c5 ON c1.gid = c5.gid;
 
 
 -- ============================================================================

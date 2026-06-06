@@ -119,6 +119,30 @@ def procesar_analisis_jcm3():
         for row in cur.fetchall():
             print(f"        - Polígono ID: {str(row[0]).ljust(5)} | Cód SIOSE: {row[1]} ({row[2]}) : {row[3]}% edificado")
 
+        # Reporte de entidades que requieren corrección manual
+        print("\n" + "=" * 80)
+        print("RESUMEN DE ENTIDADES QUE REQUIEREN CORRECCIÓN MANUAL (QA/QC EN JCM3)")
+        print("=" * 80)
+        
+        cur.execute("SELECT count(*) FROM jcm3.building WHERE requiere_edicion_manual;")
+        manual_buildings = cur.fetchone()[0]
+        print(f"Edificios (building) que requieren edición manual: {manual_buildings}")
+        if manual_buildings > 0:
+            cur.execute("SELECT gml_id, motivo_inconsistencia FROM jcm3.building WHERE requiere_edicion_manual LIMIT 5;")
+            for row in cur.fetchall():
+                print(f"  - Edificio ID: {row[0]} | Motivo: {row[1]}")
+                
+        cur.execute("SELECT count(*) FROM jcm3.tramovial WHERE requiere_edicion_manual;")
+        manual_roads = cur.fetchone()[0]
+        print(f"Tramos viales (tramovial) que requieren edición manual: {manual_roads}")
+        if manual_roads > 0:
+            cur.execute("SELECT id_tramo, motivo_inconsistencia FROM jcm3.tramovial WHERE requiere_edicion_manual LIMIT 5;")
+            for row in cur.fetchall():
+                # Motivo_inconsistencia may contain semicolons; format neatly
+                motivo = row[1] if row[1] else "Inconsistencia no especificada"
+                print(f"  - Vial ID: {row[0]} | Motivo: {motivo}")
+        print("=" * 80)
+
         # 9 (Localización Óptima)
         print("\n" + "=" * 80)
         print("RESULTADOS DEL ANÁLISIS DE LOCALIZACIÓN ÓPTIMA MULTICRITERIO (SECCIÓN 9)")

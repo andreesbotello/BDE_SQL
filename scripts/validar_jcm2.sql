@@ -2,7 +2,7 @@
 -- SCRIPT DE VALIDACIÓN E INTEGRIDAD GEOMÉTRICA PARA EL ESQUEMA jcm2
 -- ============================================================================
 
-SELECT 'ttmm' AS tabla, COUNT(*) AS total, COUNT(CASE WHEN NOT ST_IsValid(geom) THEN 1 END) AS invalidos FROM jcm2.ttmm
+SELECT 'municipio' AS tabla, COUNT(*) AS total, COUNT(CASE WHEN NOT ST_IsValid(geom) THEN 1 END) AS invalidos FROM jcm2.municipio
 UNION ALL
 SELECT 'building', COUNT(*), COUNT(CASE WHEN NOT ST_IsValid(geom) THEN 1 END) FROM jcm2.building
 UNION ALL

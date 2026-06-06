@@ -53,8 +53,11 @@ def importar_capas():
         print(f"[WARNING] No se pudo consultar la lista de tablas existentes: {e}")
 
     # Preguntar al usuario sobre la sobrescritura
-    respuesta = input("¿Desea sobrescribir todas las tablas y reiniciar el esquema jcm1? (s/n) [s]: ").strip().lower()
-    overwrite_all = respuesta not in ["n", "no"]
+    try:
+        respuesta = input("¿Desea sobrescribir todas las tablas y reiniciar el esquema jcm1? (s/n) [s]: ").strip().lower()
+        overwrite_all = respuesta not in ["n", "no"]
+    except EOFError:
+        overwrite_all = True
 
     # Ejecutar el SQL de limpieza si se desea sobrescribir todo
     if overwrite_all:
